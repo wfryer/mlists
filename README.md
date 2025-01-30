@@ -5,4 +5,4 @@ Run the current iteration of this script / project on [GitHub pages](https://wfr
 
 Read more background about this project and my process on [this blog post](https://www.speedofcreativity.org/2025/01/29/sharing-mastodon-lists).
 
-Find me on Mastodon on [mastodon.cloud/@wfryer](url). All my social media channels are on [wesfryer.com/after](url).
+[Find me on Mastodon](https://mastodon.cloud/@wfryer). All my social media channels are on [wesfryer.com/after](https://wesfryer.com/after).
