@@ -3,4 +3,4 @@ I created this (with help from Claude.ai) because I want an easy and simple Mast
 
 Run the current iteration of this script / project on wfryer.github.io/mlists/
 
-Find me on Mastodon on [mastodon.cloud/@wfryer](url). My other social media channels are on [wesfryer.com/after](url).
+Find me on Mastodon on [mastodon.cloud/@wfryer](url). All my social media channels are on [wesfryer.com/after](url).
