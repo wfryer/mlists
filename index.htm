@@ -1,0 +1,455 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>My Mastodon Lists</title>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/js-cookie/3.0.1/js.cookie.min.js"></script>
+    <style>
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            max-width: 800px;
+            margin: 20px auto;
+            padding: 0 20px;
+            line-height: 1.6;
+            color: #333;
+        }
+        .list {
+            border: 1px solid #ddd;
+            margin: 20px 0;
+            padding: 20px;
+            border-radius: 8px;
+            background: white;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.05);
+        }
+        .account {
+            display: flex;
+            align-items: flex-start;
+            padding: 15px 10px;
+            border-bottom: 1px solid #eee;
+        }
+        .account:last-child {
+            border-bottom: none;
+        }
+        .account-left {
+            display: flex;
+            align-items: flex-start;
+            flex-grow: 1;
+        }
+        .avatar {
+            width: 48px;
+            height: 48px;
+            border-radius: 50%;
+            margin-right: 15px;
+        }
+        .login-section {
+            text-align: center;
+            padding: 40px 0;
+        }
+        .button {
+            background: #6364FF;
+            color: white;
+            padding: 10px 20px;
+            border-radius: 4px;
+            border: none;
+            cursor: pointer;
+            font-size: 16px;
+            margin: 5px;
+            transition: background 0.2s;
+        }
+        .button:hover {
+            background: #5253ee;
+        }
+        .name {
+            font-weight: bold;
+        }
+        .handle {
+            color: #666;
+        }
+        .bio {
+            font-size: 0.9em;
+            color: #444;
+            margin-top: 5px;
+        }
+        .controls {
+            background: #f7f7f7;
+            padding: 20px;
+            border-radius: 8px;
+            margin: 20px 0;
+        }
+        .list-selector {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 10px;
+            margin: 15px 0;
+        }
+        .list-checkbox {
+            display: flex;
+            align-items: center;
+            background: white;
+            padding: 8px 12px;
+            border-radius: 4px;
+            border: 1px solid #ddd;
+        }
+        .list-checkbox input {
+            margin-right: 8px;
+        }
+        .hidden {
+            display: none;
+        }
+        .select-buttons {
+            margin-bottom: 15px;
+        }
+        .secondary-button {
+            background: #555;
+            color: white;
+            padding: 5px 10px;
+            border-radius: 4px;
+            border: none;
+            cursor: pointer;
+            font-size: 14px;
+            margin: 0 5px;
+        }
+        .follow-button {
+            background: #6364FF;
+            color: white;
+            padding: 6px 12px;
+            border-radius: 4px;
+            border: none;
+            cursor: pointer;
+            font-size: 14px;
+            margin-top: 8px;
+        }
+        .profile-link {
+            color: inherit;
+            text-decoration: none;
+        }
+        .profile-link:hover {
+            text-decoration: underline;
+        }
+        .separator {
+            border: 0;
+            height: 1px;
+            background-image: linear-gradient(to right, rgba(0, 0, 0, 0), rgba(0, 0, 0, 0.15), rgba(0, 0, 0, 0));
+            margin: 30px 0;
+        }
+        .attribution {
+            text-align: center;
+            padding: 20px 0;
+            color: #666;
+            font-size: 0.9em;
+        }
+        .attribution a {
+            color: #6364FF;
+            text-decoration: none;
+        }
+        .attribution a:hover {
+            text-decoration: underline;
+        }
+    </style>
+</head>
+<body>
+    <div id="login-section" class="login-section">
+        <h1>View My Mastodon Lists</h1>
+        <p>Connect with your Mastodon account to view lists</p>
+        <input type="text" id="instance" placeholder="Your instance (e.g., mastodon.social)" style="padding: 8px; margin-right: 10px;">
+        <button onclick="login()" class="button">Connect to Mastodon</button>
+    </div>
+
+    <div id="lists-section" style="display: none;">
+        <h1>My Mastodon Lists</h1>
+        <div class="controls">
+            <div class="select-buttons">
+                <button onclick="selectAll()" class="secondary-button">Select All</button>
+                <button onclick="deselectAll()" class="secondary-button">Deselect All</button>
+            </div>
+            <div id="list-selector" class="list-selector">
+                <!-- List checkboxes will be inserted here -->
+            </div>
+            <button onclick="downloadHTML()" class="button">Download Selected Lists</button>
+            <button onclick="updateDisplay()" class="button">Update Display</button>
+        </div>
+        <div id="lists"></div>
+        <hr class="separator">
+        <div class="attribution">
+            Script coded by <a href="https://github.com/wfryer/" target="_blank">Wes Fryer</a> of Charlotte, NC with lots of help from Claude.ai
+        </div>
+    </div>
+
+    <script>
+        const clientName = 'Mastodon List Viewer';
+        const scopes = 'read:lists read:accounts';
+        let currentLists = [];
+        let selectedLists = new Set();
+
+        function createExportHTML(date, lists) {
+            return `<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Mastodon Lists - ${date}</title>
+    <style>
+        ${document.querySelector('style').innerHTML}
+    </style>
+    <script>
+        function showFollowDialog(account) {
+            const instance = prompt("Enter your Mastodon instance (e.g., mastodon.social):", localStorage.getItem('lastInstance') || '');
+            if (instance) {
+                localStorage.setItem('lastInstance', instance);
+                const followUrl = \`https://\${instance}/authorize_interaction?uri=\${encodeURIComponent(account.url)}\`;
+                window.open(followUrl, '_blank');
+            }
+        }
+    <\/script>
+</head>
+<body>
+    <h1>Mastodon Lists - ${date}</h1>
+    ${lists.map(list => `
+        <div class="list">
+            <h2>${list.title}</h2>
+            ${list.accounts.map(account => `
+                <div class="account">
+                    <div class="account-left">
+                        <a href="${account.url}" target="_blank" class="profile-link">
+                            <img src="${account.avatar}" alt="${account.displayName}" class="avatar">
+                        </a>
+                        <div class="account-info">
+                            <a href="${account.url}" target="_blank" class="profile-link">
+                                <div class="name">${account.displayName}</div>
+                                <div class="handle">${account.handle}</div>
+                            </a>
+                            <div class="bio">${account.bio}</div>
+                            <button onclick="showFollowDialog({
+                                display_name: '${account.displayName.replace(/'/g, "\\'")}',
+                                url: '${account.url}',
+                                handle: '${account.handle}'
+                            })" class="follow-button">
+                                Follow
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            `).join('')}
+        </div>
+    `).join('')}
+    <hr class="separator">
+    <div class="attribution">
+        Script coded by <a href="https://github.com/wfryer/" target="_blank">Wes Fryer</a> of Charlotte, NC with lots of help from Claude.ai
+    </div>
+</body>
+</html>`;
+        }
+
+        function downloadHTML() {
+            const date = new Date().toLocaleDateString();
+            const filteredLists = currentLists.filter(list => selectedLists.has(list.title));
+            const htmlContent = createExportHTML(date, filteredLists);
+            
+            const blob = new Blob([htmlContent], { type: 'text/html' });
+            const url = window.URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            a.href = url;
+            a.download = `mastodon-lists-${date.replace(/\//g, '-')}.html`;
+            document.body.appendChild(a);
+            a.click();
+            document.body.removeChild(a);
+            window.URL.revokeObjectURL(url);
+        }
+
+        function selectAll() {
+            const checkboxes = document.querySelectorAll('.list-checkbox input');
+            checkboxes.forEach(cb => {
+                cb.checked = true;
+                selectedLists.add(cb.value);
+            });
+            updateDisplay();
+        }
+
+        function deselectAll() {
+            const checkboxes = document.querySelectorAll('.list-checkbox input');
+            checkboxes.forEach(cb => {
+                cb.checked = false;
+                selectedLists.delete(cb.value);
+            });
+            updateDisplay();
+        }
+
+        function updateDisplay() {
+            document.querySelectorAll('.list').forEach(listElement => {
+                const listTitle = listElement.querySelector('h2').textContent;
+                listElement.classList.toggle('hidden', !selectedLists.has(listTitle));
+            });
+        }
+
+        function createListSelector(lists) {
+            const selector = document.getElementById('list-selector');
+            selector.innerHTML = lists.map(list => `
+                <label class="list-checkbox">
+                    <input type="checkbox" 
+                           value="${list.title}" 
+                           ${selectedLists.has(list.title) ? 'checked' : ''}
+                           onchange="toggleList('${list.title}', this.checked)">
+                    ${list.title}
+                </label>
+            `).join('');
+        }
+
+        function toggleList(title, checked) {
+            if (checked) {
+                selectedLists.add(title);
+            } else {
+                selectedLists.delete(title);
+            }
+        }
+
+        function showFollowDialog(account) {
+            const instance = prompt("Enter your Mastodon instance (e.g., mastodon.social):", localStorage.getItem('lastInstance') || '');
+            if (instance) {
+                localStorage.setItem('lastInstance', instance);
+                const followUrl = `https://${instance}/authorize_interaction?uri=${encodeURIComponent(account.url)}`;
+                window.open(followUrl, '_blank');
+            }
+        }
+
+        async function login() {
+            const instance = document.getElementById('instance').value.trim();
+            if (!instance) {
+                alert('Please enter your Mastodon instance');
+                return;
+            }
+
+            Cookies.set('mastodon_instance', instance);
+            const app = await createApp(instance);
+            Cookies.set('client_id', app.client_id);
+            Cookies.set('client_secret', app.client_secret);
+
+            const authUrl = `https://${instance}/oauth/authorize?` + 
+                `client_id=${app.client_id}&` +
+                `scope=${encodeURIComponent(scopes)}&` +
+                `redirect_uri=${encodeURIComponent(window.location.href)}&` +
+                `response_type=code`;
+            
+            window.location.href = authUrl;
+        }
+
+        async function createApp(instance) {
+            const response = await fetch(`https://${instance}/api/v1/apps`, {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                },
+                body: JSON.stringify({
+                    client_name: clientName,
+                    redirect_uris: window.location.href,
+                    scopes: scopes,
+                    website: window.location.href
+                })
+            });
+            return response.json();
+        }
+
+        async function getAccessToken(code, instance) {
+            const clientId = Cookies.get('client_id');
+            const clientSecret = Cookies.get('client_secret');
+            
+            const response = await fetch(`https://${instance}/oauth/token`, {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                },
+                body: JSON.stringify({
+                    client_id: clientId,
+                    client_secret: clientSecret,
+                    redirect_uri: window.location.href,
+                    grant_type: 'authorization_code',
+                    code: code,
+                    scope: scopes
+                })
+            });
+            return response.json();
+        }
+
+        async function fetchLists(instance, accessToken) {
+            const listsResponse = await fetch(`https://${instance}/api/v1/lists`, {
+                headers: {
+                    'Authorization': `Bearer ${accessToken}`
+                }
+            });
+            const lists = await listsResponse.json();
+            
+            const listsContainer = document.getElementById('lists');
+            currentLists = [];
+            listsContainer.innerHTML = '';
+            
+            for (const list of lists) {
+                const accountsResponse = await fetch(`https://${instance}/api/v1/lists/${list.id}/accounts`, {
+                    headers: {
+                        'Authorization': `Bearer ${accessToken}`
+                    }
+                });
+                const accounts = await accountsResponse.json();
+                
+                const processedAccounts = accounts.map(account => ({
+                    handle: `@${account.username}@${new URL(account.url).hostname}`,
+                    displayName: account.display_name,
+                    bio: account.note,
+                    avatar: account.avatar,
+                    url: account.url,
+                    acct: account.acct
+                }));
+                
+                currentLists.push({ title: list.title, accounts: processedAccounts });
+                selectedLists.add(list.title);
+                
+                const listElement = document.createElement('div');
+                listElement.className = 'list';
+                listElement.innerHTML = `
+                    <h2>${list.title}</h2>
+                    ${processedAccounts.map(account => `
+                        <div class="account">
+                            <div class="account-left">
+                                <a href="${account.url}" target="_blank" class="profile-link">
+                                    <img src="${account.avatar}" alt="${account.displayName}" class="avatar">
+                                </a>
+                                <div class="account-info">
+                                    <a href="${account.url}" target="_blank" class="profile-link">
+<div class="name">${account.displayName}</div>
+                                        <div class="handle">${account.handle}</div>
+                                    </a>
+                                    <div class="bio">${account.bio}</div>
+                                    <button onclick="showFollowDialog({
+                                        display_name: '${account.displayName.replace(/'/g, "\\'")}',
+                                        url: '${account.url}',
+                                        handle: '${account.handle}'
+                                    })" class="follow-button">
+                                        Follow
+                                    </button>
+                                </div>
+                            </div>
+                        </div>
+                    `).join('')}
+                `;
+                listsContainer.appendChild(listElement);
+            }
+            
+            createListSelector(currentLists);
+        }
+
+        // Check for OAuth callback
+        const urlParams = new URLSearchParams(window.location.search);
+        const code = urlParams.get('code');
+        const instance = Cookies.get('mastodon_instance');
+
+        if (code && instance) {
+            document.getElementById('login-section').style.display = 'none';
+            document.getElementById('lists-section').style.display = 'block';
+
+            getAccessToken(code, instance)
+                .then(data => {
+                    fetchLists(instance, data.access_token);
+                });
+        }
+    </script>
+</body>
+</html>
